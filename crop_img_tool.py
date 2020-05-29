@@ -12,10 +12,15 @@ http://opensource.org/licenses/mit-license.php
 
 #from Tkinter import *   # for Python2
 from tkinter import *   # for Python3
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageFile
 import os
 import sys
 import shutil
+import io
+
+
+# for avoiding errors of resizing image error
+#ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 # >>> environment params --------------------
@@ -74,7 +79,15 @@ class MainWindow():
             new_im_path = os.path.join(RE_IM_DIR,
                             os.extsep.join([os.path.splitext(im_name)[0], SAVE_EXT]) )
             try:
+                # default
                 im = Image.open(im_path)
+                '''
+                # corresponding to loading progressive JPEGs
+                #   -> reference: "https://github.com/python-pillow/Pillow/issues/2717"
+                with open(im_path, 'rb') as f:
+                    im = Image.open(io.BytesIO(f.read() + b'\xff\xd9'))
+                '''
+
             except Exception as e:
                 print('\n  >> [Loading image Error] Cannot load: {}'.format(im_name))
                 print('  -> Error type:\n  > ' + str(e))
@@ -128,23 +141,27 @@ class MainWindow():
             # resizing
             try:
                 new_im = im.resize(new_size, Image.ANTIALIAS)
+                # save resized new image
+                new_im.save(new_im_path)
+                # loading images
+                self.my_images.append(ImageTk.PhotoImage(new_im))
             except Exception as e:
                 print('\n  >> [Resize image Error] Cannot Resize: {}'.format(im_name))
                 print('  -> Resize: from-{} >-> to-{}'.format(im.size, new_size))
                 print('  -> Error type:\n  > ' + str(e))
-                print('  -> Skip image...')
+                if 'broken data' in str(e):
+                    print(' -> May be, org_images folder contains a progressive image.')
+                    print(' -> This application does not support progressive image format.')
+                    print(' -> Quit application, because org_images folder contains broken data.')
+                    quit()
 
-            # save resized new image
-            new_im.save(new_im_path)
+                print('  -> Skip image...')
 
             # for debugging
             '''
             print('resized image size:')
             print(new_im.size)
             '''
-
-            # loading images
-            self.my_images.append(ImageTk.PhotoImage(new_im))
 
             # adding file path list
             self.my_img_paths.append(new_im_path)
